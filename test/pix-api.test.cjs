@@ -89,3 +89,13 @@ test('diagnóstico separa autenticação, dados e formato sem divulgar valores s
   assert.equal(providerDiagnostic({ message: 'CPF invalido' }, 400).category, 'customer_validation');
   assert.equal(providerDiagnostic({ success: true, transactionId: 'id', pixCopiaECola: pixCode }, 200).amountPresent, false);
 });
+test('recusa PixGateIP é identificada como falha do processador, sem confundir contato com conta', async () => {
+  const failure = { success: false, error: 'PixGateIP: Não foi possível gerar o PIX no momento. Entre em contato com o suporte.' };
+  assert.equal(providerDiagnostic(failure, 400).category, 'payment_processor');
+  assert.equal(providerDiagnostic({ error: 'Entre em contato com o suporte.' }, 400).category, 'response_format');
+  const result = await run(request(), { fetchImpl: async () => ({ ok: false, status: 400, json: async () => failure }) });
+  assert.equal(result.status, 502);
+  assert.equal(result.body.code, 'PIX_PROVIDER_REJECTED');
+  assert.match(result.body.error, /serviço de pagamento/);
+  assert.equal(result.body.pixCode, undefined);
+});

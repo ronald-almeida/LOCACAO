@@ -18,7 +18,8 @@ function providerDiagnostic(data, status, privateValues = []) {
   if (status === 401 || status === 403 || /api.?key|chave|unauthor|autentica|credencia/.test(message)) category = 'authentication';
   else if (/cpf|cnpj|customer|cliente|email|e-mail|phone|telefone|celular/.test(message)) category = 'customer_validation';
   else if (/storeurl|store.url|dom[ií]nio|domain|url.*loja/.test(message)) category = 'store_url';
-  else if (/kyc|verifica|conta|account|habilita|ativad/.test(message)) category = 'account_configuration';
+  else if (/pixgateip|adquirente|acquirer/.test(message)) category = 'payment_processor';
+  else if (/\bkyc\b|\bconta\b|\baccount\b|habilita|ativad/.test(message)) category = 'account_configuration';
   else if (status === 429) category = 'rate_limit';
   else if (status >= 500) category = 'provider_unavailable';
   let reason = [data?.error, data?.message, data?.error?.message]
@@ -97,7 +98,17 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
       });
       const data = await upstream.json();
       const code = typeof data?.pixCopiaECola === 'string' ? data.pixCopiaECola.trim() : '';
-      if (!upstream.ok || data?.success !== true || Number(data.amount) !== AMOUNT || !code.startsWith('000201') || code.length < 50 || code.length > 4096 || !data.transactionId) {
+      if (!upstream.ok || data?.success !== true) {
+        const diagnostic = providerDiagnostic(data, upstream.status, [env.FIREBOT_API_KEY.trim(), code, ...Object.values(customer)]);
+        logger.error(JSON.stringify(diagnostic));
+        return reply(res, 502, {
+          error: diagnostic.category === 'payment_processor' || diagnostic.category === 'provider_unavailable'
+            ? 'O serviço de pagamento não conseguiu gerar o Pix. Tente novamente mais tarde ou entre em contato com o suporte.'
+            : 'Não foi possível gerar o Pix. Entre em contato com o suporte.',
+          code: 'PIX_PROVIDER_REJECTED'
+        });
+      }
+      if (Number(data.amount) !== AMOUNT || !code.startsWith('000201') || code.length < 50 || code.length > 4096 || !data.transactionId) {
         logger.error(JSON.stringify(providerDiagnostic(data, upstream.status, [env.FIREBOT_API_KEY.trim(), code, ...Object.values(customer)])));
         return reply(res, 502, { error: 'Não foi possível obter um Pix válido. Aguarde um momento e tente novamente.' });
       }
