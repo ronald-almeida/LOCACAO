@@ -3,7 +3,7 @@
 const validation = require('../public/validation');
 const AMOUNT = 287;
 const DESCRIPTION = 'BLACK INFINITA DA LOCAÇÃO';
-const ENDPOINT = 'https://firebotbr.com/api/v1/pix/create';
+const API_URL = 'https://atlaspags.com/api/v1/charges';
 
 function reply(res, status, body) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -11,37 +11,18 @@ function reply(res, status, body) {
   return res.status(status).json(body);
 }
 
-function providerDiagnostic(data, status, privateValues = []) {
-  const message = [data?.error, data?.message, data?.error?.message, data?.code]
-    .filter(value => typeof value === 'string').join(' ').toLowerCase();
-  let category = 'response_format';
-  if (status === 401 || status === 403 || /api.?key|chave|unauthor|autentica|credencia/.test(message)) category = 'authentication';
-  else if (/cpf|cnpj|customer|cliente|email|e-mail|phone|telefone|celular/.test(message)) category = 'customer_validation';
-  else if (/storeurl|store.url|dom[ií]nio|domain|url.*loja/.test(message)) category = 'store_url';
-  else if (/pixgateip|adquirente|acquirer/.test(message)) category = 'payment_processor';
-  else if (/\bkyc\b|\bconta\b|\baccount\b|habilita|ativad/.test(message)) category = 'account_configuration';
-  else if (status === 429) category = 'rate_limit';
-  else if (status >= 500) category = 'provider_unavailable';
-  let reason = [data?.error, data?.message, data?.error?.message]
-    .filter(value => typeof value === 'string').join(' ');
-  for (const value of privateValues) {
-    if (typeof value === 'string' && value.length >= 3) reason = reason.split(value).join('[redacted]');
-  }
-  reason = reason.replace(/https?:\/\/\S+/gi, '[url]')
-    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]')
-    .replace(/\b\d[\d.\s/()+-]{6,}\d\b/g, '[number]')
-    .replace(/[A-Za-z0-9_-]{24,}/g, '[token]').slice(0, 300);
-  return {
-    event: 'firebot_pix_rejected', httpStatus: status, category,
-    reason,
-    success: data?.success === true,
-    amountPresent: data?.amount !== undefined,
-    amountMatches: Number(data?.amount) === AMOUNT,
-    pixCodePresent: typeof data?.pixCopiaECola === 'string',
-    pixCodeLength: typeof data?.pixCopiaECola === 'string' ? data.pixCopiaECola.trim().length : 0,
-    transactionIdPresent: Boolean(data?.transactionId),
-    nestedData: Boolean(data?.data && typeof data.data === 'object')
-  };
+function providerDiagnostic(data, status) {
+  const providerError = data?.error;
+  const errorCode = typeof providerError?.code === 'string' && /^[a-z0-9_]{1,80}$/i.test(providerError.code)
+    ? providerError.code : undefined;
+  const category = status === 401 ? 'authentication'
+    : status === 403 ? 'account_configuration'
+      : status === 422 ? 'customer_validation'
+        : status === 429 ? 'rate_limit'
+          : status >= 500 ? 'provider_unavailable' : 'request_rejected';
+  const requestId = typeof providerError?.request_id === 'string' && /^[a-z0-9_-]{1,80}$/i.test(providerError.request_id)
+    ? providerError.request_id : undefined;
+  return { event: 'atlas_pix_rejected', httpStatus: status, category, ...(errorCode ? { errorCode } : {}), ...(requestId ? { requestId } : {}) };
 }
 
 function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...args), logger = console } = {}) {
@@ -60,8 +41,13 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
     } catch {
       return reply(res, 503, { error: 'O Pix está temporariamente indisponível. Entre em contato com o suporte.' });
     }
-    if (!env.FIREBOT_API_KEY?.trim()) {
+    const secretKey = env.ATLAS_SECRET_KEY?.trim();
+    if (!secretKey?.startsWith('atlas_sk_')) {
       return reply(res, 503, { error: 'O Pix está temporariamente indisponível. Entre em contato com o suporte.' });
+    }
+    const idempotencyKey = req.headers['idempotency-key'];
+    if (typeof idempotencyKey !== 'string' || idempotencyKey.length > 100 || !/^[A-Za-z0-9._:-]+$/.test(idempotencyKey)) {
+      return reply(res, 400, { error: 'Não foi possível identificar esta tentativa. Atualize a página e tente novamente.' });
     }
     const origin = req.headers.origin;
     const local = env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
@@ -82,40 +68,52 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
     const errors = validation.errors(customer);
     if (Object.keys(errors).length) return reply(res, 400, { error: 'Confira os dados informados.', fields: errors });
 
+    const payload = {
+      amount: AMOUNT,
+      method: 'pix',
+      description: DESCRIPTION,
+      checkout_url: storeUrl.href,
+      customer: { name: customer.nome, email: customer.email, document: customer.cpf, phone: customer.celular },
+    };
+    const serialized = JSON.stringify(payload);
     try {
-      // O preço e a descrição nunca são aceitos do navegador.
-      const upstream = await fetchImpl(ENDPOINT, {
+      const upstream = await fetchImpl(API_URL, {
         method: 'POST',
-        headers: { accept: 'application/json', 'content-type': 'application/json', 'x-api-key': env.FIREBOT_API_KEY.trim() },
-        body: JSON.stringify({
-          productType: 'DIGITAL', storeUrl: storeUrl.href, amount: AMOUNT,
-          description: DESCRIPTION,
-          customer: { name: customer.nome, email: customer.email, cpf: customer.cpf, phone: customer.celular },
-          qrStyle: 'plain'
-        }),
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${secretKey}`,
+          'content-type': 'application/json',
+          'content-length': String(Buffer.byteLength(serialized)),
+          'idempotency-key': idempotencyKey,
+        },
+        body: serialized,
         signal: AbortSignal.timeout(18000),
-        redirect: 'error'
+        redirect: 'error',
       });
-      const data = await upstream.json();
-      const code = typeof data?.pixCopiaECola === 'string' ? data.pixCopiaECola.trim() : '';
-      if (!upstream.ok || data?.success !== true) {
-        const diagnostic = providerDiagnostic(data, upstream.status, [env.FIREBOT_API_KEY.trim(), code, ...Object.values(customer)]);
+      const text = await upstream.text();
+      if (text.length > 65536) throw new Error('provider_response_too_large');
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error('provider_response_invalid'); }
+      if (!upstream.ok) {
+        const diagnostic = providerDiagnostic(data, upstream.status);
         logger.error(JSON.stringify(diagnostic));
         return reply(res, 502, {
-          error: diagnostic.category === 'payment_processor' || diagnostic.category === 'provider_unavailable'
-            ? 'O serviço de pagamento não conseguiu gerar o Pix. Tente novamente mais tarde ou entre em contato com o suporte.'
-            : 'Não foi possível gerar o Pix. Entre em contato com o suporte.',
-          code: 'PIX_PROVIDER_REJECTED'
+          error: diagnostic.category === 'provider_unavailable' || diagnostic.category === 'rate_limit'
+            ? 'O serviço de pagamento está indisponível. Aguarde um momento e tente novamente.'
+            : 'Não foi possível gerar o Pix. Confira os dados e entre em contato com o suporte.',
+          code: 'PIX_PROVIDER_REJECTED',
         });
       }
-      if (Number(data.amount) !== AMOUNT || !code.startsWith('000201') || code.length < 50 || code.length > 4096 || !data.transactionId) {
-        logger.error(JSON.stringify(providerDiagnostic(data, upstream.status, [env.FIREBOT_API_KEY.trim(), code, ...Object.values(customer)])));
-        return reply(res, 502, { error: 'Não foi possível obter um Pix válido. Aguarde um momento e tente novamente.' });
+      const code = typeof data?.pix?.code === 'string' ? data.pix.code.trim() : '';
+      const validId = typeof data?.id === 'string' && /^[A-Za-z0-9._~-]{1,128}$/.test(data.id);
+      if (!validId || data.method !== 'pix' || !['pending', 'paid'].includes(data.status) || Number(data.amount) !== AMOUNT || !code.startsWith('000201') || code.length < 50 || code.length > 4096) {
+        logger.error(JSON.stringify(providerDiagnostic(data, upstream.status)));
+        return reply(res, 502, { error: 'Não foi possível validar o Pix recebido. Entre em contato com o suporte.' });
       }
-      // O QR é gerado localmente a partir do mesmo código. Nenhum dado é enviado a serviços de imagens.
-      return reply(res, 200, { success: true, amount: AMOUNT, pixCode: code, transactionId: String(data.transactionId) });
+      // O QR é gerado localmente a partir do código Pix retornado pela Atlas Pags.
+      return reply(res, 200, { success: true, amount: AMOUNT, pixCode: code, transactionId: data.id, status: data.status });
     } catch (error) {
-      logger.error(JSON.stringify({ event: 'firebot_pix_request_failed', category: error?.name === 'TimeoutError' ? 'timeout' : 'network_or_json' }));
+      logger.error(JSON.stringify({ event: 'atlas_pix_request_failed', category: error?.name === 'TimeoutError' ? 'timeout' : 'network_or_response' }));
       // Nunca registrar corpo da resposta, código Pix, dados pessoais ou credenciais.
       return reply(res, 502, { error: 'Não recebemos a resposta do serviço Pix. Aguarde um momento antes de tentar novamente.' });
     }
