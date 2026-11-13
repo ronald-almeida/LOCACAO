@@ -81,7 +81,7 @@ test('biblioteca local gera QR do código retornado pelo gateway', () => {
   assert.ok(code.getModuleCount() >= 21);
 });
 test('diagnóstico separa autenticação, dados e formato sem divulgar valores sensíveis', () => {
-  const diagnostic = providerDiagnostic({ ...gateway, error: 'Invalid API key test-only-secret', customer, token: 'secret-token' }, 401);
+  const diagnostic = providerDiagnostic({ ...gateway, error: 'Invalid API key test-only-secret', customer, token: 'secret-token' }, 401, [env.FIREBOT_API_KEY, ...Object.values(customer)]);
   assert.equal(diagnostic.category, 'authentication');
   assert.equal(diagnostic.httpStatus, 401);
   const serialized = JSON.stringify(diagnostic);

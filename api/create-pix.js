@@ -11,7 +11,7 @@ function reply(res, status, body) {
   return res.status(status).json(body);
 }
 
-function providerDiagnostic(data, status) {
+function providerDiagnostic(data, status, privateValues = []) {
   const message = [data?.error, data?.message, data?.error?.message, data?.code]
     .filter(value => typeof value === 'string').join(' ').toLowerCase();
   let category = 'response_format';
@@ -21,8 +21,18 @@ function providerDiagnostic(data, status) {
   else if (/kyc|verifica|conta|account|habilita|ativad/.test(message)) category = 'account_configuration';
   else if (status === 429) category = 'rate_limit';
   else if (status >= 500) category = 'provider_unavailable';
+  let reason = [data?.error, data?.message, data?.error?.message]
+    .filter(value => typeof value === 'string').join(' ');
+  for (const value of privateValues) {
+    if (typeof value === 'string' && value.length >= 3) reason = reason.split(value).join('[redacted]');
+  }
+  reason = reason.replace(/https?:\/\/\S+/gi, '[url]')
+    .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]')
+    .replace(/\b\d[\d.\s/()+-]{6,}\d\b/g, '[number]')
+    .replace(/[A-Za-z0-9_-]{24,}/g, '[token]').slice(0, 300);
   return {
     event: 'firebot_pix_rejected', httpStatus: status, category,
+    reason,
     success: data?.success === true,
     amountPresent: data?.amount !== undefined,
     amountMatches: Number(data?.amount) === AMOUNT,
@@ -88,7 +98,7 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
       const data = await upstream.json();
       const code = typeof data?.pixCopiaECola === 'string' ? data.pixCopiaECola.trim() : '';
       if (!upstream.ok || data?.success !== true || Number(data.amount) !== AMOUNT || !code.startsWith('000201') || code.length < 50 || code.length > 4096 || !data.transactionId) {
-        logger.error(JSON.stringify(providerDiagnostic(data, upstream.status)));
+        logger.error(JSON.stringify(providerDiagnostic(data, upstream.status, [env.FIREBOT_API_KEY.trim(), code, ...Object.values(customer)])));
         return reply(res, 502, { error: 'Não foi possível obter um Pix válido. Aguarde um momento e tente novamente.' });
       }
       // O QR é gerado localmente a partir do mesmo código. Nenhum dado é enviado a serviços de imagens.
