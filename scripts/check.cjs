@@ -9,7 +9,7 @@ const html = readFileSync(join(root, 'public/index.html'), 'utf8');
 for (const match of html.matchAll(/(?:src|href)="(\/[^"#?]+)"/g)) {
   if (!existsSync(join(root, 'public', match[1]))) throw new Error(`Asset ausente: ${match[1]}`);
 }
-for (const forbidden of ['FIREBOT_API_KEY', 'payment-method-card', 'payment-method-bankslip']) {
+for (const forbidden of ['ATLAS_SECRET_KEY', 'payment-method-card', 'payment-method-bankslip']) {
   if (html.includes(forbidden)) throw new Error(`Conteúdo inesperado no checkout: ${forbidden}`);
 }
 console.log('Sintaxe e arquivos públicos verificados. Checkout pronto para build.');

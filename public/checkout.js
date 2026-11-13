@@ -12,6 +12,8 @@ const copyStatus = document.querySelector('#copy-status');
 const fields = ['nome', 'cpf', 'email', 'confirm-email', 'celular'];
 let pending = false;
 let currentPix = null;
+let idempotencyKey = '';
+let idempotencyFingerprint = '';
 let copyTimer;
 
 function fieldError(id, message) {
@@ -74,6 +76,11 @@ form.addEventListener('submit', async event => {
     document.getElementById(Object.keys(errors)[0]).focus();
     return;
   }
+  const fingerprint = JSON.stringify(data);
+  if (fingerprint !== idempotencyFingerprint) {
+    idempotencyFingerprint = fingerprint;
+    idempotencyKey = crypto.randomUUID();
+  }
   // Reabrir o modal não cria outra cobrança na mesma sessão da página.
   if (currentPix) { openPix(); return; }
   pending = true;
@@ -82,7 +89,7 @@ form.addEventListener('submit', async event => {
   payLabel.textContent = 'Gerando seu Pix…';
   try {
     const response = await fetch('/api/create-pix', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: AbortSignal.timeout(22000)
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data), signal: AbortSignal.timeout(22000)
     });
     let result;
     try { result = await response.json(); } catch { throw new Error('O serviço Pix está indisponível. Tente novamente em instantes.'); }
