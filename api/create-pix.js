@@ -11,7 +11,29 @@ function reply(res, status, body) {
   return res.status(status).json(body);
 }
 
-function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...args) } = {}) {
+function providerDiagnostic(data, status) {
+  const message = [data?.error, data?.message, data?.error?.message, data?.code]
+    .filter(value => typeof value === 'string').join(' ').toLowerCase();
+  let category = 'response_format';
+  if (status === 401 || status === 403 || /api.?key|chave|unauthor|autentica|credencia/.test(message)) category = 'authentication';
+  else if (/cpf|cnpj|customer|cliente|email|e-mail|phone|telefone|celular/.test(message)) category = 'customer_validation';
+  else if (/storeurl|store.url|dom[ií]nio|domain|url.*loja/.test(message)) category = 'store_url';
+  else if (/kyc|verifica|conta|account|habilita|ativad/.test(message)) category = 'account_configuration';
+  else if (status === 429) category = 'rate_limit';
+  else if (status >= 500) category = 'provider_unavailable';
+  return {
+    event: 'firebot_pix_rejected', httpStatus: status, category,
+    success: data?.success === true,
+    amountPresent: data?.amount !== undefined,
+    amountMatches: Number(data?.amount) === AMOUNT,
+    pixCodePresent: typeof data?.pixCopiaECola === 'string',
+    pixCodeLength: typeof data?.pixCopiaECola === 'string' ? data.pixCopiaECola.trim().length : 0,
+    transactionIdPresent: Boolean(data?.transactionId),
+    nestedData: Boolean(data?.data && typeof data.data === 'object')
+  };
+}
+
+function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...args), logger = console } = {}) {
   return async function handler(req, res) {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
@@ -53,7 +75,7 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
       // O preço e a descrição nunca são aceitos do navegador.
       const upstream = await fetchImpl(ENDPOINT, {
         method: 'POST',
-        headers: { accept: 'application/json', 'content-type': 'application/json', 'x-api-key': env.FIREBOT_API_KEY },
+        headers: { accept: 'application/json', 'content-type': 'application/json', 'x-api-key': env.FIREBOT_API_KEY.trim() },
         body: JSON.stringify({
           productType: 'DIGITAL', storeUrl: storeUrl.href, amount: AMOUNT,
           description: DESCRIPTION,
@@ -66,12 +88,14 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
       const data = await upstream.json();
       const code = typeof data?.pixCopiaECola === 'string' ? data.pixCopiaECola.trim() : '';
       if (!upstream.ok || data?.success !== true || Number(data.amount) !== AMOUNT || !code.startsWith('000201') || code.length < 50 || code.length > 4096 || !data.transactionId) {
+        logger.error(JSON.stringify(providerDiagnostic(data, upstream.status)));
         return reply(res, 502, { error: 'Não foi possível obter um Pix válido. Aguarde um momento e tente novamente.' });
       }
       // O QR é gerado localmente a partir do mesmo código. Nenhum dado é enviado a serviços de imagens.
       return reply(res, 200, { success: true, amount: AMOUNT, pixCode: code, transactionId: String(data.transactionId) });
-    } catch {
-      // Não expor resposta do gateway, dados pessoais nem credenciais nos logs/cliente.
+    } catch (error) {
+      logger.error(JSON.stringify({ event: 'firebot_pix_request_failed', category: error?.name === 'TimeoutError' ? 'timeout' : 'network_or_json' }));
+      // Nunca registrar corpo da resposta, código Pix, dados pessoais ou credenciais.
       return reply(res, 502, { error: 'Não recebemos a resposta do serviço Pix. Aguarde um momento antes de tentar novamente.' });
     }
   };
@@ -79,3 +103,4 @@ function createHandler({ env = process.env, fetchImpl = (...args) => fetch(...ar
 
 module.exports = createHandler();
 module.exports.createHandler = createHandler;
+module.exports.providerDiagnostic = providerDiagnostic;

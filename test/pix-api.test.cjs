@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { createHandler } = require('../api/create-pix');
+const { createHandler, providerDiagnostic } = require('../api/create-pix');
 const validation = require('../public/validation');
 const qr = require('../public/assets/qrcode');
 
@@ -13,7 +13,7 @@ async function run(req, options = {}) {
   let sent;
   const calls = [];
   const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, status(n) { this.code = n; return this; }, json(data) { sent = data; } };
-  const handler = createHandler({ env, fetchImpl: async (...args) => { calls.push(args); return { ok: true, json: async () => gateway }; }, ...options });
+  const handler = createHandler({ env, logger: { error() {} }, fetchImpl: async (...args) => { calls.push(args); return { ok: true, status: 200, json: async () => gateway }; }, ...options });
   await handler(req, res);
   return { status: res.code, headers: res.headers, body: sent, calls };
 }
@@ -79,4 +79,13 @@ test('biblioteca local gera QR do código retornado pelo gateway', () => {
   const code = qr(0, 'M'); code.addData(pixCode); code.make();
   assert.match(code.createDataURL(6, 24), /^data:image\/gif;base64,/);
   assert.ok(code.getModuleCount() >= 21);
+});
+test('diagnóstico separa autenticação, dados e formato sem divulgar valores sensíveis', () => {
+  const diagnostic = providerDiagnostic({ ...gateway, error: 'Invalid API key test-only-secret', customer, token: 'secret-token' }, 401);
+  assert.equal(diagnostic.category, 'authentication');
+  assert.equal(diagnostic.httpStatus, 401);
+  const serialized = JSON.stringify(diagnostic);
+  for (const value of [env.FIREBOT_API_KEY, customer.cpf, customer.email, pixCode, 'secret-token']) assert.equal(serialized.includes(value), false);
+  assert.equal(providerDiagnostic({ message: 'CPF invalido' }, 400).category, 'customer_validation');
+  assert.equal(providerDiagnostic({ success: true, transactionId: 'id', pixCopiaECola: pixCode }, 200).amountPresent, false);
 });
