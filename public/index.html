@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Black Infinita da Locação. Finalize sua compra por R$ 287,00 à vista no Pix.">
+  <title>BLACK INFINITA DA LOCAÇÃO | Checkout Pix</title>
+  <link rel="icon" href="/assets/pix.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/assets/qrcode.js" defer></script>
+  <script src="/validation.js" defer></script>
+  <script src="/checkout.js" defer></script>
+</head>
+<body>
+  <div id="demo-notice" class="demo-notice" hidden>PRÉVIA DE TESTE — QR code demonstrativo. Nenhuma cobrança real será gerada.</div>
+  <header class="banner page-width">
+    <img src="/assets/banner.jpg" width="1200" height="300" alt="Black Infinita da Locação. Nunca mais dependa da venda de imóveis para faturar alto todo mês.">
+  </header>
+  <main class="layout page-width">
+    <section class="checkout-card" aria-label="Finalizar compra">
+      <div class="country"><span aria-hidden="true">🇧🇷</span> Brasil <span class="currency">• BRL</span></div>
+      <div class="product">
+        <img class="product-image" src="/assets/product.jpg" width="144" height="144" alt="Black Infinita da Locação">
+        <div>
+          <h1>BLACK INFINITA DA LOCAÇÃO</h1>
+          <p class="only">Por apenas</p>
+          <p class="price"><span>R$</span> 287,00</p>
+          <p class="cash">à vista no <strong>Pix</strong></p>
+        </div>
+      </div>
+      <form id="checkout-form" novalidate>
+        <div class="field"><label for="nome">Nome Completo ou Razão Social</label><input id="nome" name="nome" placeholder="Digite seu nome completo" autocomplete="name" maxlength="120" required aria-describedby="nome-error"><small id="nome-error" class="field-error"></small></div>
+        <div class="field"><label for="cpf">CPF ou CNPJ</label><input id="cpf" name="cpf" placeholder="Digite o CPF ou CNPJ" inputmode="numeric" maxlength="18" required aria-describedby="cpf-error"><small id="cpf-error" class="field-error"></small></div>
+        <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" placeholder="Digite o e-mail para receber o conteúdo" autocomplete="email" maxlength="254" required aria-describedby="email-error"><small id="email-error" class="field-error"></small></div>
+        <div class="field"><label for="confirm-email">Confirme seu E-mail</label><input id="confirm-email" name="confirmEmail" type="email" placeholder="Confirme o e-mail para receber o conteúdo" autocomplete="off" maxlength="254" required aria-describedby="confirm-email-error"><small id="confirm-email-error" class="field-error"></small></div>
+        <div class="phone-row"><div class="ddi"><label>DDI</label><div>🇧🇷 +55</div></div><div class="field"><label for="celular">Celular</label><input id="celular" name="celular" type="tel" placeholder="(00) 00000-0000" autocomplete="tel-national" maxlength="15" required aria-describedby="celular-error"><small id="celular-error" class="field-error"></small></div></div>
+        <p class="protected"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg> Seus dados estão protegidos</p>
+        <section class="payment" aria-labelledby="payment-title">
+          <h2 id="payment-title">FORMA DE PAGAMENTO</h2>
+          <div class="pix-option"><img src="/assets/pix.svg" width="30" height="30" alt=""><strong>Pix</strong><span class="selected" aria-label="Selecionado">✓</span></div>
+          <div class="pix-info"><strong>Pague com Pix</strong><p>Ao continuar, você verá o QR code e o código Pix Copia e Cola para pagar pelo aplicativo do seu banco.</p><span>Pagamento único de <b>R$ 287,00</b></span></div>
+        </section>
+        <section class="summary" aria-labelledby="summary-title">
+          <h2 id="summary-title"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 3h2l3 12h10l3-9H6M9 20h.01M18 20h.01"/></svg> RESUMO DA COMPRA</h2>
+          <p class="table-label">Produto</p>
+          <div class="summary-product"><img src="/assets/product.jpg" width="48" height="48" alt=""><span>BLACK INFINITA DA LOCAÇÃO</span><strong>R$ 287,00</strong></div>
+          <div class="summary-row table-label"><span>Forma de pagamento</span><span>Valor</span></div>
+          <div class="summary-row"><span>Pix à vista</span><strong>R$ 287,00</strong></div>
+        </section>
+        <p id="form-error" class="error-banner" role="alert" hidden></p>
+        <button id="pay-button" class="primary" type="submit"><span id="pay-label">Pagar e Receber Agora</span><span aria-hidden="true">→</span></button>
+        <p class="privacy-note">Seus dados serão enviados ao Firebot para gerar o Pix desta compra. Confira o valor e o recebedor no aplicativo do seu banco antes de pagar.</p>
+      </form>
+      <div class="trust-row"><span>⌑ Pagamento via Pix</span><span>♧ Dados protegidos</span></div>
+      <p class="processor">Pagamento processado por <strong>Firebot</strong></p>
+    </section>
+    <aside class="details-card" aria-label="Sobre o produto">
+      <p class="muted">Oferecido por:</p>
+      <strong class="seller">FADEL IMÓVEIS E TREINAMENTOS LTDA</strong>
+      <a class="seller-email" href="mailto:suportefl@alexandrefadel.adv.br">suportefl@alexandrefadel.adv.br</a>
+      <div class="included"><p>Neste combo você vai receber os seguintes produtos:</p><ul>
+        <li>Curso Fórmula da Locação</li>
+        <li>Curso Stok de Captação de Imóveis</li>
+        <li>Curso Equipe Expert em Locação de Imóveis</li>
+        <li>Playbook das Garantias Locatícias</li>
+        <li>E-book Manual do Locatário</li>
+        <li>Playbook Reforma Tributária na Locação</li>
+        <li>Enciclopédia Operacional da Locação</li>
+        <li>Curso Aprova em Análise de Ficha Cadastral</li>
+        <li>Curso Invest em Compra e Venda de Carteira de Imóveis</li>
+      </ul></div>
+    </aside>
+  </main>
+  <footer class="page-width footer">BLACK INFINITA DA LOCAÇÃO <span>Checkout • Pix</span></footer>
+  <dialog id="pix-dialog" aria-labelledby="pix-title" aria-describedby="pix-description">
+    <button class="close" id="close-dialog" type="button" aria-label="Fechar pagamento Pix">×</button>
+    <div class="modal-icon"><img src="/assets/pix.svg" width="28" height="28" alt=""></div>
+    <h2 id="pix-title">Pague com Pix</h2>
+    <p id="pix-description">Escaneie o QR code com o aplicativo do seu banco ou copie o código abaixo.</p>
+    <p class="modal-price">R$ 287,00 <span>à vista</span></p>
+    <img id="qr-code" class="qr-code" width="248" height="248" alt="QR code do Pix de R$ 287,00" hidden>
+    <p id="qr-error" class="field-error" hidden>Não foi possível exibir o QR code. Use o código Pix abaixo.</p>
+    <label for="pix-code" class="code-label">Código Pix Copia e Cola</label>
+    <textarea id="pix-code" rows="2" readonly spellcheck="false" aria-label="Código Pix Copia e Cola"></textarea>
+    <button id="copy-button" class="primary" type="button">Copiar código Pix</button>
+    <p id="copy-status" role="status" aria-live="polite"></p>
+    <div class="modal-help"><b>Como pagar</b><ol><li>Abra o aplicativo do seu banco e escolha Pix.</li><li>Leia o QR code ou selecione “Pix Copia e Cola”.</li><li>Confira o recebedor e o valor de R$ 287,00 antes de confirmar.</li></ol></div>
+    <p class="payment-note">Gerar ou copiar o código não confirma o pagamento.</p>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "locacao-checkout",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Checkout Black Infinita da Locação — Pix Firebot de R$ 287,00",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.local scripts/dev.cjs",
+    "demo": "node scripts/dev.cjs --demo",
+    "test": "node --test test/*.test.cjs",
+    "build": "node scripts/check.cjs"
+  },
+  "engines": { "node": "24.x" }
+}
